@@ -2,43 +2,36 @@ package main
 
 import (
 	"bufio"
+	"flag"
+	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
 
-//..<!--# hallo -->*::*<!--# bye-bye -->..//
-//..file=<!--# @include.txt -->=..user=<!--# USER -->=
+// command-line options in one structure
+type flagsSet struct {
+	inFileName  string
+	outFileName string
+	tokenTrim   bool
+	macStart    string
+	macEnd      string
+	defines     map[string]string
+}
+
 func main() {
 
 	var err error
-	var inFile *os.File
-	var outFile *os.File
 
-	// 2do move to args
-	inFileName := "-"
-	outFileName := "-"
-	tokenTrim := true
-	macStart := "<!--#"
-	macEnd := "-->"
-	macXP := regexp.MustCompile(macStart + "(.+?)" + macEnd)
+	flags := readFlags()
+	inFile, outFile := get_files(flags)
 
-	if inFileName == "-" || inFileName == "" {
-		inFile = os.Stdin
-	} else {
-		inFile, err = os.Open(inFileName)
-		check(err)
-		defer inFile.Close()
-	}
+	defer inFile.Close()
+	defer outFile.Close()
 
-	if outFileName == "-" || outFileName == "" {
-		outFile = os.Stdout
-	} else {
-		outFile, err = os.Create(outFileName)
-		check(err)
-		defer inFile.Close()
-	}
+	macXP := regexp.MustCompile(flags.macStart + "(.+?)" + flags.macEnd)
 
 	scanner := bufio.NewScanner(inFile)
 	writer := bufio.NewWriter(outFile)
@@ -53,8 +46,8 @@ func main() {
 				// match = [start, end, g1_start, g2_end]
 				otext += itext[i:v[0]]
 				token = strings.Trim(itext[v[2]:v[3]], " \n\t")
-				otoken := replace(token)
-				if tokenTrim {
+				otoken := boombastia(token, flags)
+				if flags.tokenTrim {
 					otoken = strings.Trim(otoken, " \n\t")
 				}
 				otext += otoken
@@ -73,17 +66,47 @@ func main() {
 
 }
 
-func replace(input string) string {
+func boombastia(token string, flags flagsSet) string {
+	// Expand TOKEN -- load a file, get variable
 
 	// load file
-	if strings.HasPrefix(input, "@") {
-		data, err := ioutil.ReadFile(input[1:])
+	if strings.HasPrefix(token, "@") {
+		data, err := ioutil.ReadFile(token[1:])
 		check(err)
 		return string(data)
 	}
 
-	// return ENV variable
-	return os.Getenv(input)
+	// get ENV variable
+	if strings.HasPrefix(token, "$") {
+		return os.Getenv(token[1:])
+	}
+
+	// get define
+	return flags.defines[token]
+
+}
+
+func get_files(flags flagsSet) (*os.File, *os.File) {
+
+	var err error
+	var inFile *os.File
+	var outFile *os.File
+
+	if flags.inFileName == "-" || flags.inFileName == "" {
+		inFile = os.Stdin
+	} else {
+		inFile, err = os.Open(flags.inFileName)
+		check(err)
+	}
+
+	if flags.outFileName == "-" || flags.outFileName == "" {
+		outFile = os.Stdout
+	} else {
+		outFile, err = os.Create(flags.outFileName)
+		check(err)
+	}
+
+	return inFile, outFile
 
 }
 
@@ -91,4 +114,48 @@ func check(err error) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+type flagsArray []string
+
+func (i *flagsArray) String() string         { return "" }
+func (i *flagsArray) Set(value string) error { *i = append(*i, value); return nil }
+
+func readFlags() flagsSet {
+
+	// read Command-Line Flags
+
+	var flags = flagsSet{}
+	flags.defines = make(map[string]string)
+
+	flag.BoolVar(&flags.tokenTrim, "trim", true, "trim spaces in expanded macro")
+	flag.StringVar(&flags.macStart, "start", "<!--#", "macro openner (prefix)")
+	flag.StringVar(&flags.macEnd, "end", "-->", "macro closer (suffix)")
+	flag.StringVar(&flags.inFileName, "i", "-", "input file (stdin)")
+	flag.StringVar(&flags.outFileName, "o", "-", "output file (stdin)")
+
+	var defines flagsArray
+	flag.Var(&defines, "d", "define macro value")
+
+	usage := func() {
+		exename := filepath.Base(os.Args[0])
+		fmt.Println(exename + " -- super simple micro macro processor (for text files only!)")
+		flag.PrintDefaults()
+	}
+
+	flag.Usage = usage
+
+	flag.Parse()
+
+	if len(defines) > 0 {
+		for _, def := range defines {
+			parts := strings.Split(def, "=")
+			if len(parts) == 2 {
+				flags.defines[parts[0]] = parts[1]
+			}
+		}
+	}
+
+	return flags
+
 }
