@@ -18,6 +18,7 @@ type flagsSet struct {
 	tokenTrim   bool
 	macStart    string
 	macEnd      string
+	workDir     string
 	defines     map[string]string
 }
 
@@ -26,12 +27,13 @@ func main() {
 	var err error
 
 	flags := readFlags()
-	inFile, outFile := get_files(flags)
+	inFile, outFile := getFiles(flags)
 
 	defer inFile.Close()
 	defer outFile.Close()
 
-	macXP := regexp.MustCompile(flags.macStart + "(.+?)" + flags.macEnd)
+	// macro expression
+	macXP := regexp.MustCompile(regexp.QuoteMeta(flags.macStart) + "(.+?)" + regexp.QuoteMeta(flags.macEnd))
 
 	scanner := bufio.NewScanner(inFile)
 	writer := bufio.NewWriter(outFile)
@@ -71,7 +73,7 @@ func boombastia(token string, flags flagsSet) string {
 
 	// load file
 	if strings.HasPrefix(token, "@") {
-		data, err := ioutil.ReadFile(token[1:])
+		data, err := ioutil.ReadFile(flags.workDir + token[1:])
 		check(err)
 		return string(data)
 	}
@@ -86,7 +88,7 @@ func boombastia(token string, flags flagsSet) string {
 
 }
 
-func get_files(flags flagsSet) (*os.File, *os.File) {
+func getFiles(flags flagsSet) (*os.File, *os.File) {
 
 	var err error
 	var inFile *os.File
@@ -131,15 +133,16 @@ func readFlags() flagsSet {
 	flag.BoolVar(&flags.tokenTrim, "trim", true, "trim spaces in expanded macro")
 	flag.StringVar(&flags.macStart, "start", "<!--#", "macro openner (prefix)")
 	flag.StringVar(&flags.macEnd, "end", "-->", "macro closer (suffix)")
-	flag.StringVar(&flags.inFileName, "i", "-", "input file (stdin)")
-	flag.StringVar(&flags.outFileName, "o", "-", "output file (stdin)")
+	flag.StringVar(&flags.inFileName, "i", "-", "input file ('-' is stdin)")
+	flag.StringVar(&flags.outFileName, "o", "-", "output file ('-' is stdout)")
+	flag.StringVar(&flags.workDir, "w", ".", "working directory (for file includes)")
 
 	var defines flagsArray
-	flag.Var(&defines, "d", "define macro value")
+	flag.Var(&defines, "d", "define macro variable (-d NAME=VALUE)")
 
 	usage := func() {
 		exename := filepath.Base(os.Args[0])
-		fmt.Println(exename + " -- super simple micro macro processor (for text files only!)")
+		fmt.Println(exename, `-- super simple micro macro processor for text files`)
 		flag.PrintDefaults()
 	}
 
