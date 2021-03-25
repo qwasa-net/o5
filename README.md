@@ -1,9 +1,12 @@
 # o5≠m4
 
-[![Go](https://github.com/qwasa-net/o5/actions/workflows/go.yml/badge.svg)](https://github.com/qwasa-net/o5/actions/workflows/go.yml)
+[![Go Build & Test](https://github.com/qwasa-net/o5/actions/workflows/go.yml/badge.svg)](https://github.com/qwasa-net/o5/actions/workflows/go.yml)
+[![Build and Release](https://github.com/qwasa-net/o5/actions/workflows/build-package.yml/badge.svg)](https://github.com/qwasa-net/o5/actions/workflows/build-package.yml)
+
 
 ```
 o5 -- super simple micro macro processor for text files
+
   -d value
         define macro variable (-d NAME=VALUE)
   -end string
@@ -59,3 +62,5 @@ root:x:0:0:root:/root:/bin/bash
 daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
 …
 ```
+
+:wq

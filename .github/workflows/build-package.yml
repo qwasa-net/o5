@@ -1,0 +1,38 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.15
+
+      - name: Get Label (from last commit id)
+        id: label
+        run: echo "::set-output name=label::$(git log --format="%h" -n 1)"
+
+      - name: Build (GOOS=linux GOARCH=amd64)
+        run: GOOS=linux GOARCH=amd64 go build -a -v -o o5.linux.amd64 ./
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.label.outputs.label }}
+          files: |
+            o5.linux.amd64
+            README.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
