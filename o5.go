@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -11,7 +12,7 @@ import (
 	"strings"
 )
 
-// command-line options in one structure
+// flagsSet is all command-line options in one structure
 type flagsSet struct {
 	inFileName  string
 	outFileName string
@@ -22,18 +23,23 @@ type flagsSet struct {
 	defines     map[string]string
 }
 
+// main is an entry point
 func main() {
+	flags := readFlags()
+	inFile, outFile := getFiles(flags)
+	defer inFile.Close()
+	defer outFile.Close()
+	parse(inFile, outFile, flags)
+}
+
+// parse reads from inFile and writes to outFile
+func parse(inFile io.Reader, outFile io.Writer, flags flagsSet) {
 
 	var err error
 
-	flags := readFlags()
-	inFile, outFile := getFiles(flags)
-
-	defer inFile.Close()
-	defer outFile.Close()
-
 	// macro expression
-	macXP := regexp.MustCompile(regexp.QuoteMeta(flags.macStart) + "(.+?)" + regexp.QuoteMeta(flags.macEnd))
+	qStart, qEnd := regexp.QuoteMeta(flags.macStart), regexp.QuoteMeta(flags.macEnd)
+	macXP := regexp.MustCompile(qStart + "(.+?)" + qEnd)
 
 	scanner := bufio.NewScanner(inFile)
 	writer := bufio.NewWriter(outFile)
@@ -68,8 +74,8 @@ func main() {
 
 }
 
+// boombastia expands tokens with file content or variable
 func boombastia(token string, flags flagsSet) string {
-	// Expand TOKEN -- load a file, get variable
 
 	// load file
 	if strings.HasPrefix(token, "@") {
@@ -88,6 +94,7 @@ func boombastia(token string, flags flagsSet) string {
 
 }
 
+// getFiles reads flags and returns Files to read from and write to
 func getFiles(flags flagsSet) (*os.File, *os.File) {
 
 	var err error
@@ -112,6 +119,7 @@ func getFiles(flags flagsSet) (*os.File, *os.File) {
 
 }
 
+// check panics
 func check(err error) {
 	if err != nil {
 		panic(err)
@@ -123,26 +131,24 @@ type flagsArray []string
 func (i *flagsArray) String() string         { return "" }
 func (i *flagsArray) Set(value string) error { *i = append(*i, value); return nil }
 
+// readFlags reads command line parameters
 func readFlags() flagsSet {
 
-	// read Command-Line Flags
+	var flags = getDefaultFlags()
 
-	var flags = flagsSet{}
-	flags.defines = make(map[string]string)
-
-	flag.BoolVar(&flags.tokenTrim, "trim", true, "trim spaces in expanded macro")
-	flag.StringVar(&flags.macStart, "start", "<!--#", "macro openner (prefix)")
-	flag.StringVar(&flags.macEnd, "end", "-->", "macro closer (suffix)")
-	flag.StringVar(&flags.inFileName, "i", "-", "input file ('-' is stdin)")
-	flag.StringVar(&flags.outFileName, "o", "-", "output file ('-' is stdout)")
-	flag.StringVar(&flags.workDir, "w", ".", "working directory (for file includes)")
+	flag.BoolVar(&flags.tokenTrim, "trim", flags.tokenTrim, "trim spaces in expanded macro")
+	flag.StringVar(&flags.macStart, "start", flags.macStart, "macro openner (prefix)")
+	flag.StringVar(&flags.macEnd, "end", flags.macEnd, "macro closer (suffix)")
+	flag.StringVar(&flags.inFileName, "i", flags.inFileName, "input file ('-' is stdin)")
+	flag.StringVar(&flags.outFileName, "o", flags.outFileName, "output file ('-' is stdout)")
+	flag.StringVar(&flags.workDir, "w", flags.workDir, "working directory (for file includes)")
 
 	var defines flagsArray
 	flag.Var(&defines, "d", "define macro variable (-d NAME=VALUE)")
 
 	usage := func() {
 		exename := filepath.Base(os.Args[0])
-		fmt.Println(exename, `-- super simple micro macro processor for text files`)
+		fmt.Fprint(os.Stderr, exename, " -- super simple micro macro processor for text files\n\n")
 		flag.PrintDefaults()
 	}
 
@@ -160,5 +166,20 @@ func readFlags() flagsSet {
 	}
 
 	return flags
+
+}
+
+// getDefaultFlags creates flagsSet with default presets
+func getDefaultFlags() flagsSet {
+
+	return flagsSet{
+		tokenTrim:   true,
+		macStart:    "<!--#",
+		macEnd:      "-->",
+		inFileName:  "-",
+		outFileName: "-",
+		workDir:     ".",
+		defines:     make(map[string]string),
+	}
 
 }
