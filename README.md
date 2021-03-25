@@ -1,5 +1,6 @@
 # o5≠m4
 
+[![Go](https://github.com/qwasa-net/o5/actions/workflows/go.yml/badge.svg)](https://github.com/qwasa-net/o5/actions/workflows/go.yml)
 
 ```
 o5 -- super simple micro macro processor for text files
