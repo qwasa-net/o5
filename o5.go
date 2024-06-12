@@ -21,6 +21,7 @@ type flagsSet struct {
 	macEnd      string
 	workDir     string
 	defines     map[string]string
+	definesFile string
 }
 
 // main is an entry point
@@ -142,9 +143,9 @@ func readFlags() flagsSet {
 	flag.StringVar(&flags.inFileName, "i", flags.inFileName, "input file ('-' is stdin)")
 	flag.StringVar(&flags.outFileName, "o", flags.outFileName, "output file ('-' is stdout)")
 	flag.StringVar(&flags.workDir, "w", flags.workDir, "working directory (for file includes)")
-
 	var defines flagsArray
 	flag.Var(&defines, "d", "define macro variable (-d NAME=VALUE)")
+	flag.StringVar(&flags.definesFile, "dd", flags.definesFile, "read macro variables from file")
 
 	usage := func() {
 		exename := filepath.Base(os.Args[0])
@@ -161,6 +162,19 @@ func readFlags() flagsSet {
 			parts := strings.Split(def, "=")
 			if len(parts) == 2 {
 				flags.defines[parts[0]] = parts[1]
+			}
+		}
+	}
+
+	if flags.definesFile != "" {
+		data, err := os.ReadFile(flags.definesFile)
+		check(err)
+		for _, line := range strings.Split(string(data), "\n") {
+			parts := strings.Split(line, "=")
+			if len(parts) == 2 {
+				flags.defines[parts[0]] = parts[1]
+			} else {
+				flags.defines[parts[0]] = ""
 			}
 		}
 	}
